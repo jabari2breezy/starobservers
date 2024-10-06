@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Orrery</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+        #slider {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 200px;
+        }
+        #info {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            color: #fff;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 250px;
+            display: none;
+        }
+        #info img {
+            width: 100%;
+            border-radius: 5px;
+        }
+        #orbitToggle {
+            position: absolute;
+            top: 500px;
+            left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <input id="slider" type="range" min="1" max="100" value="50">
+    <label id="orbitToggle">
+        <input type="checkbox" id="toggleOrbits" checked> Show Orbits
+    </label>
+    <div id="info"></div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Planet and NEO data with more information
+        const objects = [
+            { name: "Sun", distance: 0, radius: 20, speed: 0, color: "yellow", size: "1.4 million km", info: "The center of our solar system.", threat: "No significant threats.", image: "https://th.bing.com/th/id/OIP.Yg4vknBcgjwH0ibA5Z3F5QAAAA?w=181&h=180&c=7&r=0&o=5&dpr=1.5&pid=1.7" },
+            { name: "Mercury", distance: 70, radius: 4, speed: 0.1, color: "darkgray", size: "4,880 km", info: "Closest planet to the Sun.", threat: "No significant threats.", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRtfK6EMHpn_577WEcxmgPkUnKxdNbrf8IaVQ&s"},
+            { name: "Venus", distance: 110, radius: 5, speed: 0.08, color: "yellow", size: "12,104 km", info: "Second planet from the Sun, often called Earth's twin.", threat: "No significant threats.", image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Venus-real_color.jpg" },
+            { name: "Earth", distance: 130, radius: 6, speed: 0.07, color: "blue", size: "12,742 km", info: "Home planet of humans.", threat: "Climate change.", image: "https://th.bing.com/th?id=OIF.PqPmIZtujH%2f4l9SfzsExnw&w=256&h=180&c=7&r=0&o=5&dpr=1.5&pid=1.7" },
+            { name: "Mars", distance: 160, radius: 4, speed: 0.06, color: "red", size: "6,779 km", info: "Known as the Red Planet.", threat: "No significant threats.", image: "https://th.bing.com/th/id/OIP.GWLPSxaZt9H29A3h7d7lowHaFj?w=211&h=180&c=7&r=0&o=5&dpr=1.5&pid=1.7" },
+            { name: "Jupiter", distance: 220, radius: 12, speed: 0.05, color: "orange", size: "139,820 km", info: "Largest planet in the Solar System.", threat: "No significant threats.", image: "https://upload.wikimedia.org/wikipedia/commons/e/e2/Jupiter.jpg" },
+            { name: "Saturn", distance: 270, radius: 10, speed: 0.04, color: "goldenrod", size: "116,460 km", info: "Known for its rings.", threat: "No significant threats.", image: "https://th.bing.com/th/id/OIP.1OZwEAJ1heFOMxiGMMpYogHaEK?w=281&h=180&c=7&r=0&o=5&dpr=1.5&pid=1.7" },
+            { name: "Uranus", distance: 320, radius: 8, speed: 0.03, color: "lightblue", size: "50,724 km", info: "Rotates on its side.", threat: "No significant threats.", image: "https://th.bing.com/th/id/OIP.q7Pyoa2RnIRDFmEKv3PICQHaHa?w=158&h=180&c=7&r=0&o=5&dpr=1.5&pid=1.7" },
+            { name: "Neptune", distance: 370, radius: 8, speed: 0.02, color: "darkblue", size: "49,244 km", info: "Farthest planet from the Sun.", threat: "No significant threats.", image: "https://th.bing.com/th/id/OIP.zhtuxTTgMswYhArwZBLyawHaE8?w=239&h=180&c=7&r=0&o=5&dpr=1.5&pid=1.7" },
+            { name: "2011 UW158", distance: 150, radius: 3, speed: 0.1, color: "grey", size: "300 m", info: "Contains valuable metals. It has an Earth minimum orbit intersection distance of 0.0020 AU (300,000 km). ", threat: "Not a threat.", eccentricity: "0.38", inclination: "5", image: "https://upload.wikimedia.org/wikipedia/commons/4/47/2011_UW158.jpg" },
+            { name: "3200 Phaethon", distance: 200, radius: 3.5, speed: 0.08, color: "grey", size: "5.8 km", info: "Causes the Geminid meteor shower. The first asteroid to be discovered using images from a spacecraft", threat: "Not a threat.", eccentricity:"0.88990", inclination:"22.260°", image: "" },
+            { name: "433 Eros", distance: 180, radius: 4, speed: 0.09, color: "grey", size: "34.4 km", info: "Visited by NEAR Shoemaker.", threat: "Not a threat.", eccentricity:"0.2226", inclination:"10.828°", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRB5RCtR4gggWEj0B6jS8pSXxP6Tg8EWg8c-Q&s" },
+            { name: "6489 Golevka", distance: 190, radius: 3.5, speed: 0.07, color: "grey", size: "0.53 km", info: "C-type asteroid.", threat: "Not a threat.",eccentricity:"0.604021", inclination:"2.278065°", image: "https://upload.wikimedia.org/wikipedia/commons/2/22/6489_Golevka.jpg" },
+            { name: "99942 Apophis", distance: 200, radius: 4, speed: 0.06, color: "grey", size: "340 m", info: "Close approach to Earth in 2029.",threat: "Potential threat in the future.",eccentricity:"0.19144",inclination:"3.339°", image: "https://upload.wikimedia.org/wikipedia/commons/b/b0/Apophis.jpg" },
+            { name: "4179 Toutatis", distance: 150, radius: 5, speed: 0.08, color: "grey", size: "4.6 km", info: "Irregular rotation.", threat: "Not a threat.",eccentricity:"0.6288",inclination:"0.4460°", image: "https://upload.wikimedia.org/wikipedia/commons/0/0a/4179_Toutatis.jpg" },
+            { name: "1862 Apollo", distance: 230, radius: 5, speed: 0.04, color: "grey", size: "1.5 km", info: "Earth-crossing asteroid.", threat: "Not a threat.",eccentricity:"0.55994",inclination:"6.3530°", image: "https://upload.wikimedia.org/wikipedia/commons/b/b9/1862_Apollo.jpg" }
+        ];
+
+        let time = 0;
+        let speedFactor = 0.05;
+        let showOrbits = true; // Variable to track orbit visibility
+        let hoveredObject = null;
+
+        // Speed control slider
+        const slider = document.getElementById('slider');
+        slider.addEventListener('input', () => {
+            speedFactor = slider.value * 0.006;
+        });
+
+        // Orbit toggle checkbox
+        const toggleOrbits = document.getElementById('toggleOrbits');
+        toggleOrbits.addEventListener('change', () => {
+            showOrbits = toggleOrbits.checked;
+        });
+
+        // Function to draw the orbit of each object
+        function drawOrbit(object) {
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, object.distance, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+            ctx.stroke();
+        }
+
+        // Function to draw planets/NEOs
+             // Function to draw planets/NEOs
+             function drawObject(object, angle) {
+            const x = canvas.width / 2 + Math.cos(angle) * object.distance;
+            const y = canvas.height / 2 + Math.sin(angle) * object.distance;
+
+            // Draw the object (planet/NEO)
+            ctx.beginPath();
+            ctx.arc(x, y, object.radius, 0, Math.PI * 2);
+            ctx.fillStyle = object.color;
+            ctx.fill();
+
+            // Draw label next to the object
+            ctx.fillStyle = "#FFFFFF"; // White color for the label
+            ctx.font = "12px Arial";
+            ctx.fillText(object.name, x + object.radius + 5, y); // Label positioned slightly to the right of the object
+
+            // Hover detection and display info
+            if (hoveredObject === object || ctx.isPointInPath(mouseX, mouseY)) {
+                displayInfo(object);
+                hoveredObject = object;
+            }
+        }
+
+
+        // Function to display info about hovered object
+        const infoBox = document.getElementById('info');
+        function displayInfo(object) {
+    const infoBox = document.getElementById('info');
+    infoBox.style.display = 'block';
+    infoBox.innerHTML = `<strong>${object.name}</strong><br>
+    Size: ${object.size}<br>
+    Info: ${object.info}<br>
+    Eccentricity: ${object.eccentricity}<br>
+    Inclination: ${object.inclination}<br>
+    Threat: ${object.threat}<br>
+    <img src="${object.image}" alt="${object.name}">`;
+}
+
+
+        // Mouse hover tracking
+        let mouseX = 0;
+        let mouseY = 0;
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = e.offsetX;
+            mouseY = e.offsetY;
+        });
+
+        canvas.addEventListener('mouseout', () => {
+            hoveredObject = null;
+            infoBox.style.display = 'none';
+        });
+
+        // Main animation loop
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            time += speedFactor;
+
+            objects.forEach((object) => {
+                if (showOrbits && object.distance > 0) drawOrbit(object);
+                const angle = time * object.speed;
+                drawObject(object, angle);
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
